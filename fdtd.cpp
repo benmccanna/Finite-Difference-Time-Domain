@@ -8,94 +8,111 @@
 
 using namespace std;
 
-const int size = 200;
-const int maxT = 1000;
-const int nameSize = 50;
-const int outputInterval = 4;
-const double imp0 = 377.0;
+const int size = 200;         /* spatial size of the simulation */
+const int dur = 1000;        /* length of time to run the simulation */
+const int outputInterval = 4; /* how often (in frames) to record the state of the simulation */
+const double imp0 = 377.0;    /* impedance of free space */
 
-void updateFields(double *Ex, double *Hy);
-void outputField(double *F, ofstream& output);
-double sourceFunction(double t);
+class Scenario {
+  public:
+  
+    double *Ex, *Hy;
 
-struct Grid {
-  double *ex;
-  double *hz;
-  int sizeX;
-  int timeIndex, maxT;
-  double cour;
+    Scenario(int s = 200, int sn = 50) {
+      size = s;
+      sourceNode = sn;
+    }
+    
+    bool init() {
+      //Initialise fields to zero
+      Ex = (double *)calloc(size, sizeof(double));
+      Hy = (double *)calloc(size, sizeof(double));
+  
+      //Catch errors in memory allocation
+      if(Ex == NULL || Hy == NULL) {
+        cout << "Memory allocation failed" << endl;
+        return false;
+      }
+      
+      return true;
+    }
+    
+    void step(double tIndex) {
+      updateFields();
+      Ex[sourceNode] += source(tIndex);
+    }
+    
+    
+  protected:
+  
+    int size, sourceNode;
+  
+    double source(double tIndex) {
+      double srcT = tIndex - 30.;
+      return exp(-srcT*srcT / 100.);
+    }
+    
+    //Update the fields according to the Yee algorithm, ignoring the boundaries for now
+    void updateFields() {
+    
+      for (int zIndex = 0; zIndex < size - 1; zIndex++) {
+        Hy[zIndex] += (Ex[zIndex + 1] - Ex[zIndex])/imp0;
+      }
+      
+      for (int zIndex = 1; zIndex < size; zIndex++) {
+        Ex[zIndex] += (Hy[zIndex] - Hy[zIndex - 1])*imp0;
+      }
+    
+    }
+    
 };
+
+void simulate(Scenario &scene, int duration, int outputInterval, string basename);
+void outputField(double *F, ofstream &output);
+
 
 int main() {
   
-  //Pointers to field arrays
-  double *Ex, *Hy;
-  string basename = "sim";
-  stringstream filename;
+  int sourceNode = 50;
   
-  ofstream output;
-  output.open("sim.dat");
-  
-  //Allocates cleared memory for the field arrays
-  Ex = (double *)calloc(size, sizeof(double));
-  Hy = (double *)calloc(size, sizeof(double));
-  
-  //Catch errors in memory allocation
-  if(Ex == NULL || Hy == NULL) {
-    cout << "Memory allocation failed" << endl;
-    return 1;
-  }
-  
-  for (int tIndex = 0; tIndex < maxT; tIndex++) {
-
-    updateFields(Ex, Hy);
-    Ex[50] += sourceFunction(tIndex);
-    
-    if(tIndex % outputInterval == 0) {
-      filename << basename << tIndex << ".dat";
-      outputField(Hy, output);
-      filename.str(string());
-    }
-
-  }
-  
-  output.close();
+  Scenario scene(size, sourceNode);
+  simulate(scene, dur, outputInterval, "basic");
   
   return 0;
 
 }
 
-void updateFields(double *Ex, double *Hy) {
-
-  for (int zIndex = 0; zIndex < size - 1; zIndex++) {
-    Hy[zIndex] += (Ex[zIndex + 1] - Ex[zIndex])/imp0;
+void simulate(Scenario &scene, int duration, int outputInterval, string basename) {
+  
+  scene.init();
+  string filename;
+  
+  ofstream outE, outH;
+  
+  filename = basename + "-Ex.dat";
+  outE.open(filename.c_str());
+  
+  filename = basename + "-Hy.dat";
+  outH.open(filename.c_str());
+  
+  for(int tIndex = 0; tIndex < duration; tIndex++) {
+    scene.step(tIndex);
+    
+    if(tIndex % outputInterval == 0) {
+      outputField(scene.Ex, outE);
+      outputField(scene.Hy, outH);
+    }
   }
   
-  for (int zIndex = 1; zIndex < size; zIndex++) {
-    Ex[zIndex] += (Hy[zIndex] - Hy[zIndex - 1])*imp0;
-  }
-
+  outE.close();
+  outH.close();
 }
 
-void outputField(double *F, ofstream& output) {
-  
-//  ofstream output;
-//  output.open(filename.c_str());
-  
+void outputField(double *F, ofstream &output) {
+
   for (int zIndex = 0; zIndex < size; zIndex++) {
-
     output << F[zIndex] << "\t";
-
   }
-  
   output << endl;
   
-  // output.close();
-  // cout << "done";
-}
-
-//Input wave for the E field
-double sourceFunction(double t) {
-  double srcT = t - 30.;
-  return exp(-srcT*srcT / 100.);
 }
