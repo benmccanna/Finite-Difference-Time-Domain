@@ -37,9 +37,15 @@ class Scenario {
       }
     }
     
+    // Field excited at specified node
+    virtual void source(double tIndex) {
+      double srcT = tIndex - 30.0;
+      Ex[sourceNode] += exp(-srcT*srcT / 100.0);
+    }
+    
     /* The step function moves the simulation forward one step. */
     void step(double tIndex) {
-      updateFields();
+      updateFields(tIndex);
       source(tIndex);
     }
 
@@ -71,31 +77,26 @@ class Scenario {
       }
     }
     
-    virtual void ABCvalues() {}
-    virtual void TFSFhy() {}
-    virtual void ABChy() {}
-    virtual void TFSFex() {}
-    virtual void ABCex() {}
+    virtual void abcValues() {}
+    virtual void tfsfHy(double tIndex) {}
+    virtual void abcHy() {}
+    virtual void tfsfEx(double tIndex) {}
+    virtual void abcEx() {}
 
   
     /* This function will be used to apply different boundary conditions. In the
     basic case one field is fixed at zero at each end, and the simulated region
     behaves like a resonant cavity */
-    virtual void updateFields() {
-      ABCvalues();
+    virtual void updateFields(double tIndex) {
+      abcValues();
       updateHy();
-      TFSFhy();
-      ABChy();
+      tfsfHy(tIndex);
+      abcHy();
       updateEx();
-      TFSFex();
-      ABCex();
+      tfsfEx(tIndex);
+      abcEx();
     }
 
-    // Field excited at specified node
-    virtual void source(double tIndex) {
-      double srcT = tIndex - 30.0;
-      Ex[sourceNode] += exp(-srcT*srcT / 100.0);
-    }
 
     // Relative permittivity and permeability of material
     virtual double permittivity(double zIndex) {
@@ -180,14 +181,14 @@ class AbsorbingBoundaries: virtual public Scenario {
   their nearest neighbour, eliminating reflection from the boundaries in
   free space scenarios */
   protected:
-    virtual void ABCvalues() {
+    virtual void abcValues() {
       HyOldRight = Hy[size - 2];
       ExOldLeft = Ex[1];
     }
-    virtual void ABChy() {
+    virtual void abcHy() {
       Hy[size - 1] = HyOldRight;
     }
-    virtual void ABCex() {
+    virtual void abcEx() {
       Ex[0] = ExOldLeft;
     }
 
@@ -214,13 +215,41 @@ class AdvectionABC: virtual public AbsorbingBoundaries {
   the local relative permittivity and permeability, and the past and present
   values of their nearest neighbours */
   protected:
-    void ABChy() {
+    void abcHy() {
       Hy[size - 1] = HyOldRight + coeffRight * (Hy[size - 2] - Hy[size - 1]);
     }
-    void ABCex() {
+    void abcEx() {
       Ex[0] = ExOldLeft + coeffLeft * (Ex[1] - Ex[0]);
     }
 
     double coeffLeft, coeffRight;
 
+};
+
+/* Replaces the source in the basic setup with an incident wave travelling
+rightwards from a point using a Total-Field/Scattered-Field boundary at that
+point */
+class TotalScattered: virtual public Scenario {
+  public:
+    int tfsfIndex = int(size/4);
+    
+    /* Overwriting the basic additive source node */
+    void source(double zIndex) {}
+    
+    double tfsfSource(double tIndex) {
+      double srcT = tIndex - 30.0;
+      return exp(-srcT*srcT / 100.0);
+    }
+    
+    
+  /* Corrections to the update equation to inject a unidirectional wave pulse */
+  protected:
+    void tfsfHy(double tIndex) {
+      Hy[tfsfIndex - 1] -= tfsfSource(tIndex) / imp0;
+    }
+    
+    void tfsfEx(double tIndex) {
+      Ex[tfsfIndex] += tfsfSource(tIndex + 1.0);
+    }
+  
 };
