@@ -70,13 +70,25 @@ class Scenario {
         Ex[zIndex] += coeff * (Hy[zIndex] - Hy[zIndex - 1]);
       }
     }
+    
+    virtual void ABCvalues() {}
+    virtual void TFSFhy() {}
+    virtual void ABChy() {}
+    virtual void TFSFex() {}
+    virtual void ABCex() {}
+
   
     /* This function will be used to apply different boundary conditions. In the
     basic case one field is fixed at zero at each end, and the simulated region
     behaves like a resonant cavity */
     virtual void updateFields() {
+      ABCvalues();
       updateHy();
+      TFSFhy();
+      ABChy();
       updateEx();
+      TFSFex();
+      ABCex();
     }
 
     // Field excited at specified node
@@ -161,8 +173,8 @@ class LossyInterface: virtual public Scenario{
   
 };
 
-/* Adds Absorbing boundary conditions (ABCs), allowing energy to leave the
-simulation */
+/* Adds the simplest form of Absorbing boundary conditions (ABCs), allowing
+energy to leave the simulation */
 class NaiveAbsorbingBoundaries: virtual public Scenario {
   public:
     void init() {
@@ -174,10 +186,13 @@ class NaiveAbsorbingBoundaries: virtual public Scenario {
   free space scenarios */
   protected:
     void updateFields() {
-      Hy[size - 1] = Hy[size - 2];
+      double HyOldRight = Hy[size - 2];
+      double ExOldLeft = Ex[1];
+
       updateHy();
-      Ex[0] = Ex[1];
+      Hy[size - 1] = HyOldRight;
       updateEx();
+      Ex[0] = ExOldLeft;
     }
 
 };

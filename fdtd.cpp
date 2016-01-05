@@ -19,18 +19,18 @@ void outputField(vector<double> &F, ofstream &output);
 
 int main() {
   
-  // //Basic example - free space resonator with one source node
-  // Scenario basic;
-  // basic.sourceNode = defaultSource;
-  // simulate(basic, dur, outputInterval, "output/basic");
+  //Basic example - free space resonator with one source node
+  Scenario basic;
+  basic.sourceNode = defaultSource;
+  simulate(basic, dur, outputInterval, "output/basic");
   
   class : public NaiveAbsorbingBoundaries
           , public DielectricInterface
           , public LossyInterface
           {} scene1;
   scene1.sourceNode = defaultSource;
-  scene1.dielectricPermittivity = 1.0;
-  scene1.electricLoss = 0.02;
+  scene1.dielectricPermittivity = 9.0;
+  scene1.electricLoss = 0.0;
   scene1.cour = courant;
   simulate(scene1, dur, outputInterval, "output/naive-absorbing-dielectric");
   
@@ -39,8 +39,8 @@ int main() {
           , public LossyInterface
           {} scene2;
   scene2.sourceNode = defaultSource;
-  scene2.dielectricPermittivity = 1.0;
-  scene2.electricLoss = 0.02;
+  scene2.dielectricPermittivity = 9.0;
+  scene2.electricLoss = 0.0;
   scene2.cour = courant;
   simulate(scene2, dur, outputInterval, "output/advection-absorbing-dielectric");
 
