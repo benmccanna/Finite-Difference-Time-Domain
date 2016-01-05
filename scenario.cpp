@@ -175,31 +175,29 @@ class LossyInterface: virtual public Scenario{
 
 /* Adds the simplest form of Absorbing boundary conditions (ABCs), allowing
 energy to leave the simulation */
-class NaiveAbsorbingBoundaries: virtual public Scenario {
-  public:
-    void init() {
-      Scenario::init();
-    }
-
+class AbsorbingBoundaries: virtual public Scenario {
   /* The previously fixed field values are now assigned to the past value of
   their nearest neighbour, eliminating reflection from the boundaries in
   free space scenarios */
   protected:
-    void updateFields() {
-      double HyOldRight = Hy[size - 2];
-      double ExOldLeft = Ex[1];
-
-      updateHy();
+    virtual void ABCvalues() {
+      HyOldRight = Hy[size - 2];
+      ExOldLeft = Ex[1];
+    }
+    virtual void ABChy() {
       Hy[size - 1] = HyOldRight;
-      updateEx();
+    }
+    virtual void ABCex() {
       Ex[0] = ExOldLeft;
     }
+
+    double HyOldRight, ExOldLeft;
 
 };
 
 /* Adds ABCs using a first order discretised version of the advection equation,
 letting less of the field reflect than in the naive case */
-class AdvectionAbsorbingBoundaries1: virtual public Scenario {
+class AdvectionABC: virtual public AbsorbingBoundaries {
   public:
     void init() {
       double temp;
@@ -216,17 +214,13 @@ class AdvectionAbsorbingBoundaries1: virtual public Scenario {
   the local relative permittivity and permeability, and the past and present
   values of their nearest neighbours */
   protected:
-    void updateFields() {
-      double HyOldRight = Hy[size - 2];
-      double ExOldLeft = Ex[1];
-      
-      updateHy();
+    void ABChy() {
       Hy[size - 1] = HyOldRight + coeffRight * (Hy[size - 2] - Hy[size - 1]);
-      updateEx();
+    }
+    void ABCex() {
       Ex[0] = ExOldLeft + coeffLeft * (Ex[1] - Ex[0]);
     }
-    
-  private:
+
     double coeffLeft, coeffRight;
 
 };

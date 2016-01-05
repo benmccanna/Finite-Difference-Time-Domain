@@ -24,7 +24,7 @@ int main() {
   basic.sourceNode = defaultSource;
   simulate(basic, dur, outputInterval, "output/basic");
   
-  class : public NaiveAbsorbingBoundaries
+  class : public AbsorbingBoundaries
           , public DielectricInterface
           , public LossyInterface
           {} scene1;
@@ -34,7 +34,7 @@ int main() {
   scene1.cour = courant;
   simulate(scene1, dur, outputInterval, "output/naive-absorbing-dielectric");
   
-  class : public AdvectionAbsorbingBoundaries1
+  class : public AdvectionABC
           , public DielectricInterface
           , public LossyInterface
           {} scene2;
