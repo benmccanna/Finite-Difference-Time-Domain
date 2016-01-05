@@ -3,114 +3,95 @@
 #include <iomanip>
 #include <math.h>
 #include <string>
-#include <sstream>
 #include <stdlib.h>
+#include <vector>
+#include "scenario.cpp"
 
 using namespace std;
 
-const int size = 200;         /* spatial size of the simulation */
-const int dur = 1000;        /* length of time to run the simulation */
-const int outputInterval = 4; /* how often (in frames) to record the state of the simulation */
-const double imp0 = 377.0;    /* impedance of free space */
-
-class Scenario {
-  public:
-  
-    double *Ex, *Hy;
-
-    Scenario(int s = 200, int sn = 50) {
-      size = s;
-      sourceNode = sn;
-    }
-    
-    bool init() {
-      //Initialise fields to zero
-      Ex = (double *)calloc(size, sizeof(double));
-      Hy = (double *)calloc(size, sizeof(double));
-  
-      //Catch errors in memory allocation
-      if(Ex == NULL || Hy == NULL) {
-        cout << "Memory allocation failed" << endl;
-        return false;
-      }
-      
-      return true;
-    }
-    
-    void step(double tIndex) {
-      updateFields();
-      Ex[sourceNode] += source(tIndex);
-    }
-    
-    
-  protected:
-  
-    int size, sourceNode;
-  
-    double source(double tIndex) {
-      double srcT = tIndex - 30.;
-      return exp(-srcT*srcT / 100.);
-    }
-    
-    //Update the fields according to the Yee algorithm, ignoring the boundaries for now
-    void updateFields() {
-    
-      for (int zIndex = 0; zIndex < size - 1; zIndex++) {
-        Hy[zIndex] += (Ex[zIndex + 1] - Ex[zIndex])/imp0;
-      }
-      
-      for (int zIndex = 1; zIndex < size; zIndex++) {
-        Ex[zIndex] += (Hy[zIndex] - Hy[zIndex - 1])*imp0;
-      }
-    
-    }
-    
-};
+const int dur = 500;         /* how many frames to run the simulation for */
+const int outputInterval = 1; /* how often (in frames) to record the state of the simulation */
+const double courant = 1.0;
+const int defaultSource = 80;
 
 void simulate(Scenario &scene, int duration, int outputInterval, string basename);
-void outputField(double *F, ofstream &output);
-
+void outputField(vector<double> &F, ofstream &output);
 
 int main() {
   
-  int sourceNode = 50;
+  //Basic example - one source node at index 0
+  Scenario basic;
+  basic.sourceNode = defaultSource;
+  simulate(basic, dur, outputInterval, "output/basic");
   
-  Scenario scene(size, sourceNode);
-  simulate(scene, dur, outputInterval, "basic");
+  class : public NaiveAbsorbingBoundaries
+          //,public DielectricInterface
+          {} scene1;
+  scene1.sourceNode = defaultSource;
+  // scene1.dielectricPermittivity = 7.0;
+  // scene1.dielectricPermeability = 1.5;
+  scene1.cour = courant;
+  simulate(scene1, dur, outputInterval, "output/naive-absorbing-dielectric");
   
+  class : public AdvectionAbsorbingBoundaries1
+          //,public DielectricInterface
+          {} scene2;
+  scene2.sourceNode = defaultSource;
+  // scene2.dielectricPermittivity = 7.0;
+  // scene2.dielectricPermeability = 1.5;
+  scene2.cour = courant;
+  simulate(scene2, dur, outputInterval, "output/advection-absorbing-dielectric");
+
   return 0;
 
 }
 
+/* Runs simulations and saves the results to files. Takes a `Scenario` which 
+describes how to run the simulation; `duration`, the number of steps to
+simulate; `outputInterval`, the frequency with which to write the state of
+the simulation to our output files; and `basename`, the base file name to
+write the results of the simulation to. */
 void simulate(Scenario &scene, int duration, int outputInterval, string basename) {
   
+  cout << "Running simulation " << basename  << "... " << endl;
+  
+  /* Initialise the scene and make sure it doesn't have state left over from a
+  previous simulation */
   scene.init();
+  
+  // Open output files for the field arrays
   string filename;
-  
   ofstream outE, outH;
-  
   filename = basename + "-Ex.dat";
   outE.open(filename.c_str());
-  
   filename = basename + "-Hy.dat";
   outH.open(filename.c_str());
   
+  // The actual simulation:
   for(int tIndex = 0; tIndex < duration; tIndex++) {
+    // Step the simulation forward
     scene.step(tIndex);
     
+    // Output rows of data to our two output files every `outputInterval` steps
     if(tIndex % outputInterval == 0) {
       outputField(scene.Ex, outE);
       outputField(scene.Hy, outH);
     }
   }
   
+  // Close our two output files
   outE.close();
   outH.close();
+  
+  cout << "Done." << endl;
 }
 
-void outputField(double *F, ofstream &output) {
+// Output a row `F` to file `output`
+void outputField(vector<double> &F, ofstream &output) {
+  
+  int size = F.size();
 
-  for (int zIndex = 0; zIndex < size; zIndex++) {
+  for(int zIndex = 0; zIndex < size; zIndex++) {
     output << F[zIndex] << "\t";
   }
   output << endl;
