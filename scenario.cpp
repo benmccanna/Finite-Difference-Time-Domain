@@ -44,14 +44,11 @@ class Scenario {
     }
 
   protected:
-    /* Update the interior fields according to the Yee algorithm with boundary
-    nodes updated according to boundary conditions specified in
-    boundaryConditions() */
-    virtual void updateFields() {
-      //double coeff, loss;
-      
-      Hy.at(size - 1) = Hy.at(size - 2);
-      
+  
+    /* Update the interior fields according to the Yee algorithm */
+    
+    /* Magnetic field constant at rightmost node */
+    void updateHy() {
       for(int zIndex = 0; zIndex < size - 1; zIndex++) {
         // loss = hLoss(zIndex);
         // Hy[zIndex] *= (1.0 - loss) / (1.0 + loss);
@@ -60,9 +57,10 @@ class Scenario {
         
         Hy[zIndex] += (Ex[zIndex + 1] - Ex[zIndex]) / imp0;
       }
-      
-      Ex.at(0) = Ex.at(1);
-      
+    }
+    
+    /* Electric field constant at leftmost node */
+    void updateEx() {
       for(int zIndex = 1; zIndex < size; zIndex++) {
         // loss = eLoss(zIndex);
         // Ex[zIndex] *= (1.0 - loss) / (1.0 + loss);
@@ -71,9 +69,14 @@ class Scenario {
         
         Ex[zIndex] += (Hy[zIndex] - Hy[zIndex - 1]) * imp0;
       }
-      
-      
-      //boundaryConditions();
+    }
+  
+    /* This function will be used to apply different boundary conditions. In the
+    basic case one field is fixed at zero at each end, and the simulated region
+    behaves like a resonant cavity */
+    virtual void updateFields() {
+      updateHy();
+      updateEx();
     }
 
     // Field excited at specified node
@@ -81,16 +84,7 @@ class Scenario {
       double srcT = tIndex - 30.0;
       Ex[sourceNode] += exp(-srcT*srcT / 100.0);
     }
-    
-    /* The left and right boundaries model perfect electric and magnetic
-    conductors respectively, with the electric field fixed at zero at the
-    leftmost node and the magnetic field fixed at zero at the rightmost once.
-    Together this makes the simulated region act like a resonant cavity */
-    virtual void boundaryConditions() {
-      Ex[0] = 0.0;
-      Hy[size - 1] = 0.0;
-    }
-    
+
     // Relative permittivity and permeability of material
     virtual double permittivity(double zIndex) {
       return 1.0;
@@ -114,22 +108,20 @@ class Scenario {
 simulation */
 class NaiveAbsorbingBoundaries: virtual public Scenario {
   public:
-  void init() {
-    Scenario::init();
-    HyOldRight = Hy[size - 2];
-    ExOldLeft = Ex[1];
-  }
-
-  protected:
-    void boundaryConditions() {
-      Hy[size - 1] = HyOldRight;
-      HyOldRight = Hy[size - 2];
-      Ex[0] = ExOldLeft;
-      ExOldLeft = Ex[1];
+    void init() {
+      Scenario::init();
     }
-    
-  private:
-    double HyOldRight, ExOldLeft;
+
+  /* The previously fixed field values are now assigned to the past value of
+  their nearest neighbour, eliminating reflection from the boundaries in
+  free space scenarios */
+  protected:
+    void updateFields() {
+      Hy[size - 1] = Hy[size - 2];
+      updateHy();
+      Ex[0] = Ex[1];
+      updateEx();
+    }
 
 };
 
@@ -167,29 +159,31 @@ letting less of the field reflect than in the naive case */
 class AdvectionAbsorbingBoundaries1: virtual public Scenario {
   public:
     void init() {
+      double temp;
       Scenario::init();
-      HyOldRight = Hy[size - 2];
-      ExOldLeft = Ex[1];
-      double temp = sqrt(permeability(0) * permittivity(0)) / cour;
-      cout << "temp: " << temp << endl;
-      coeffLeft = (1.0 - temp) / (1.0 + temp);
-      temp = sqrt(permeability(size - 1) * permittivity(size - 1)) / cour;
-      cout << "temp: " << temp << endl;
-      coeffRight = (1.0 - temp) / (1.0 + temp);
       
-      cout << "coeffLeft: " << coeffLeft << endl;
-      cout << "coeffRight: " << coeffRight << endl;
+      temp = sqrt(permeability(0) * permittivity(0)) / cour;
+      coeffLeft = (1.0 - temp) / (1.0 + temp);
+      
+      temp = sqrt(permeability(size - 1) * permittivity(size - 1)) / cour;
+      coeffRight = (1.0 - temp) / (1.0 + temp);
     }
 
+  /* Fields on the boundary are now updated according to their present values,
+  the local relative permittivity and permeability, and the past and present
+  values of their nearest neighbours */
   protected:
-    void boundaryConditions() {
+    void updateFields() {
+      double HyOldRight = Hy[size - 2];
+      double ExOldLeft = Ex[1];
+      
+      updateHy();
       Hy[size - 1] = HyOldRight + coeffRight * (Hy[size - 2] - Hy[size - 1]);
-      HyOldRight = Hy[size - 2];
+      updateEx();
       Ex[0] = ExOldLeft + coeffLeft * (Ex[1] - Ex[0]);
-      ExOldLeft = Ex[1];
     }
     
   private:
-    double HyOldRight, ExOldLeft, coeffLeft, coeffRight;
+    double coeffLeft, coeffRight;
 
 };

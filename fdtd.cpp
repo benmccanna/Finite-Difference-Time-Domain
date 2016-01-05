@@ -19,7 +19,7 @@ void outputField(vector<double> &F, ofstream &output);
 
 int main() {
   
-  //Basic example - one source node at index 0
+  //Basic example - free space resonator with one source node
   Scenario basic;
   basic.sourceNode = defaultSource;
   simulate(basic, dur, outputInterval, "output/basic");
