@@ -47,27 +47,27 @@ class Scenario {
   
     /* Update the interior fields according to the Yee algorithm */
     
-    /* Magnetic field constant at rightmost node */
     void updateHy() {
+      double coeff, loss;
+
+      /* Magnetic field constant at rightmost node */
       for(int zIndex = 0; zIndex < size - 1; zIndex++) {
-        // loss = hLoss(zIndex);
-        // Hy[zIndex] *= (1.0 - loss) / (1.0 + loss);
-        // coeff = cour / imp0 / permeability(zIndex) / (1.0 + loss);
-        // Hy[zIndex] += coeff * (Ex[zIndex + 1] - Ex[zIndex]);
-        
-        Hy[zIndex] += (Ex[zIndex + 1] - Ex[zIndex]) / imp0;
+        loss = hLoss(zIndex);
+        Hy[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        coeff = cour / imp0 / permeability(zIndex) / (1.0 + loss);
+        Hy[zIndex] += coeff * (Ex[zIndex + 1] - Ex[zIndex]);
       }
     }
     
-    /* Electric field constant at leftmost node */
     void updateEx() {
+      double coeff, loss;
+
+      /* Electric field constant at leftmost node */
       for(int zIndex = 1; zIndex < size; zIndex++) {
-        // loss = eLoss(zIndex);
-        // Ex[zIndex] *= (1.0 - loss) / (1.0 + loss);
-        // coeff = cour * imp0 / permittivity(zIndex) / (1.0 + loss);
-        // Ex[zIndex] += coeff * (Hy[zIndex] - Hy[zIndex - 1]);
-        
-        Ex[zIndex] += (Hy[zIndex] - Hy[zIndex - 1]) * imp0;
+        loss = eLoss(zIndex);
+        Ex[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        coeff = cour * imp0 / permittivity(zIndex) / (1.0 + loss);
+        Ex[zIndex] += coeff * (Hy[zIndex] - Hy[zIndex - 1]);
       }
     }
   
@@ -104,6 +104,63 @@ class Scenario {
 
 };
 
+/* Adds an interface between free space and a dielectric medium of a different
+relative permittivity and permeability */
+class DielectricInterface: virtual public Scenario{
+  
+  public:
+    int dielectricIndex = size/2;
+    double dielectricPermittivity = 2.0;
+    double dielectricPermeability = 1.0;
+  
+  protected:
+    double permittivity(double zIndex) {
+      if(zIndex < dielectricIndex) {
+        return 1.0;
+      }
+      return dielectricPermittivity;
+    }
+    
+    double permeability(double zIndex) {
+      if(zIndex < dielectricIndex) {
+        return 1.0;
+      }
+      if(zIndex == dielectricIndex) {
+        return 0.5 * (1.0 + dielectricPermeability);
+      }
+      return dielectricPermeability;
+    }
+
+};
+
+/* Adds a lossy region with non-zero electric and/or magnetic conductivity */
+class LossyInterface: virtual public Scenario{
+  
+  public:
+    int lossyIndex = size/2;
+    double electricLoss = 0.01;
+    double magneticLoss = 0.0;
+    
+  protected:
+    double eLoss(double zIndex) {
+      if(zIndex < lossyIndex) {
+        return 0.0;
+      }
+      return electricLoss;
+    }
+    
+    double hLoss(double zIndex) {
+      if(zIndex < lossyIndex) {
+        return 0.0;
+      }
+      if(zIndex == lossyIndex) {
+        return 0.5*electricLoss;
+      }
+      return electricLoss;
+    }
+  
+};
+
 /* Adds Absorbing boundary conditions (ABCs), allowing energy to leave the
 simulation */
 class NaiveAbsorbingBoundaries: virtual public Scenario {
@@ -121,35 +178,6 @@ class NaiveAbsorbingBoundaries: virtual public Scenario {
       updateHy();
       Ex[0] = Ex[1];
       updateEx();
-    }
-
-};
-
-/* Adds an interface between free space and a dielectric medium of a different
-relative permittivity and permeability */
-class DielectricInterface: virtual public Scenario{
-  
-  public:
-    int interfaceIndex = size/2;
-    double dielectricPermittivity = 1.0;
-    double dielectricPermeability = 1.0;
-  
-  protected:
-    double permittivity(double zIndex) {
-      if(zIndex < interfaceIndex) {
-        return 1.0;
-      }
-      if(zIndex == interfaceIndex) {
-        return 0.5 * (1.0 + dielectricPermittivity);
-      }
-      return dielectricPermittivity;
-    }
-    
-    double permeability(double zIndex) {
-      if(zIndex < interfaceIndex) {
-        return 1.0;
-      }
-      return dielectricPermeability;
     }
 
 };
