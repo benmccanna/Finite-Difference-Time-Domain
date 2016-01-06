@@ -1,7 +1,7 @@
 dataFiles = $(wildcard *.dat)
 
 define MAKEPLOT
-$(1).png: $(1)
+$(1).png: $(1) draw-image.plt
 	gnuplot -e "filename='$(strip $1)'" ./draw-image.plt
 endef
 

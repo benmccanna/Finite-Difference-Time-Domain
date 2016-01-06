@@ -9,46 +9,55 @@
 
 using namespace std;
 
-const int dur = 500;         /* how many frames to run the simulation for */
+const int dur = 5000;         /* how many frames to run the simulation for */
 const int outputInterval = 1; /* how often (in frames) to record the state of the simulation */
 const double courant = 1.0;
 const int defaultSource = 150;
 
-void simulate(Scenario &scene, int duration, int outputInterval, string basename);
+void simulate(Scenario &scene, int duration, int outputInterval, string basesname);
 void outputField(vector<double> &F, ofstream &output);
 
 int main() {
   
-  //Basic example - free space resonator with one source node
-  Scenario basic;
-  basic.sourceNode = defaultSource;
-  simulate(basic, dur, outputInterval, "output/basic");
+  // Scenario basic;
+  // simulate(basic, dur, outputInterval, "output/basic");
   
-  class : public TotalScattered
-          , public DielectricInterface
-          , public AdvectionABC
-          {} incident;
-  simulate(incident, dur, outputInterval, "output/tfsf-aabc-dielectric");
+  int size = 501;
+
+  Standing standingWaves;
+  standingWaves.size = size;
   
-  class : public AbsorbingBoundaries
-          , public DielectricInterface
-          , public LossyInterface
-          {} scene1;
-  scene1.sourceNode = defaultSource;
-  scene1.dielectricPermittivity = 9.0;
-  scene1.electricLoss = 0.0;
-  scene1.cour = courant;
-  simulate(scene1, dur, outputInterval, "output/abc-dielectric");
+  for(int harmonic = 1; harmonic < 9; harmonic++) {
+    standingWaves.sourceNode = floor(size * 1 / (harmonic * 2));
+    standingWaves.frequency = 0.5 * harmonic / double(size - 1);
+    simulate(standingWaves, dur, outputInterval, "output/standing-waves" + to_string(harmonic));
+  }
+
+  // class : public TotalScattered
+  //         , public DielectricInterface
+  //         , public AdvectionABC
+  //         {} incident;
+  // simulate(incident, dur, outputInterval, "output/tfsf-aabc-dielectric");
   
-  class : public AdvectionABC
-          , public DielectricInterface
-          , public LossyInterface
-          {} scene2;
-  scene2.sourceNode = defaultSource;
-  scene2.dielectricPermittivity = 9.0;
-  scene2.electricLoss = 0.0;
-  scene2.cour = courant;
-  simulate(scene2, dur, outputInterval, "output/aabc-dielectric");
+  // class : public AbsorbingBoundaries
+  //         , public DielectricInterface
+  //         , public LossyInterface
+  //         {} scene1;
+  // scene1.sourceNode = defaultSource;
+  // scene1.dielectricPermittivity = 9.0;
+  // scene1.electricLoss = 0.0;
+  // scene1.cour = courant;
+  // simulate(scene1, dur, outputInterval, "output/abc-dielectric");
+  
+  // class : public AdvectionABC
+  //         , public DielectricInterface
+  //         , public LossyInterface
+  //         {} scene2;
+  // scene2.sourceNode = defaultSource;
+  // scene2.dielectricPermittivity = 9.0;
+  // scene2.electricLoss = 0.0;
+  // scene2.cour = courant;
+  // simulate(scene2, dur, outputInterval, "output/aabc-dielectric");
 
   return 0;
 

@@ -10,6 +10,7 @@ using namespace std;
 
 const int defaultSize = 200;  // Default size of the simulation
 const double imp0 = 377.0;    // Impedance of free space
+const double pi = 4.0*atan(1);
 
 /* The Scenario class defines a minimal simulation, including the Yee algorithm
 for updating fields in time. We inherit from this class to define more complex
@@ -17,7 +18,7 @@ simulations. */
 class Scenario {
   public:
     int size = defaultSize;           // Size of the space being simulated
-    int sourceNode = int(size/4);     // Location of the source node
+    int sourceNode;     // Location of the source node
     double sourcePeak = 30.0;         // Time of the source peak
     double cour = 1.0;                // Courant number, determines how fast waves travel
     vector<double> Ex, Hy;            // Electric and magnetic field arrays
@@ -29,31 +30,17 @@ class Scenario {
       /* Initialise fields to zero */
       Ex = vector<double> (size, 0.0);
       Hy = vector<double> (size, 0.0);
-      
-      /* Boundary conditions fail if an additive source is on or next to the 
-      boundary */
-      if(sourceNode < 2 || sourceNode > size - 2) {
-        cout << "Field source out of range of the simulation." << endl
-          << "Please enter a valid source node (an integer between 2 and "
-          << size - 2 << ")" << endl;
-        cin >> sourceNode;
-      }
-    }
-    
-    /* Field excited at specified node */
-    virtual double source(double tIndex) {
-      double srcT = tIndex - sourcePeak;
-      return exp(-srcT*srcT / 100.0);
+      checkSource();
     }
     
     /* The step function moves the simulation forward one step. */
-    void step(double tIndex) {
+    void step(int tIndex) {
       updateFields(tIndex);
     }
 
   protected:
     /* Update the interior fields according to the Yee algorithm */
-    void updateHy() {
+    virtual void updateHy() {
       double coeff, loss;
       /* Magnetic field constant at rightmost node */
       for(int zIndex = 0; zIndex < size - 1; zIndex++) {
@@ -63,7 +50,7 @@ class Scenario {
         Hy[zIndex] += coeff * (Ex[zIndex + 1] - Ex[zIndex]);
       }
     }
-    void updateEx() {
+    virtual void updateEx() {
       double coeff, loss;
       /* Electric field constant at leftmost node */
       for(int zIndex = 1; zIndex < size; zIndex++) {
@@ -74,19 +61,34 @@ class Scenario {
       }
     }
     
-    virtual void updateSource(double tIndex) {
+    /* Field excited at specified node */
+    virtual double source(int tIndex) {
+      double srcT = double(tIndex) - sourcePeak;
+      return exp(-srcT*srcT / 100.0);
+    }
+    virtual void checkSource() {
+      /* Boundary conditions fail if an additive source is on or next to the 
+      boundary */
+      if(sourceNode < 2 || sourceNode > size - 2) {
+        cout << "Field source out of range of the simulation." << endl
+          << "Please enter a valid source node (an integer between 2 and "
+          << size - 2 << ")" << endl;
+        cin >> sourceNode;
+      }
+    }
+    virtual void updateSource(int tIndex) {
       Ex[sourceNode] += source(tIndex);
     }
     
     virtual void abcValues() {}
-    virtual void tfsfCorrection(double tIndex) {}
+    virtual void tfsfCorrection(int tIndex) {}
     virtual void abcHy() {}
     virtual void abcEx() {}
   
     /* This function is a wrapper for all the possible field update functions
     required by various scenarios, allowing derived classes to avoid conflicting
     inheritance */
-    virtual void updateFields(double tIndex) {
+    virtual void updateFields(int tIndex) {
       abcValues();
       updateHy();
       tfsfCorrection(tIndex);
@@ -115,6 +117,44 @@ class Scenario {
 
 };
 
+class Standing: virtual public Scenario{
+  public:
+    void init() {
+      Ex = vector<double> (size, 0.0);
+      Hy = vector<double> (size - 1, 0.0);
+      checkSource();
+    }
+    double frequency;
+    double source(int tIndex) {
+      double t = double(tIndex);
+      return sin(2.0 * pi * frequency * t);
+    }
+    
+  protected:
+    void updateHy() {
+      double coeff, loss;
+      for(int zIndex = 0; zIndex < size - 1; zIndex++) {
+        loss = hLoss(zIndex);
+        Hy[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        coeff = cour / imp0 / permeability(zIndex) / (1.0 + loss);
+        Hy[zIndex] += coeff * (Ex[zIndex + 1] - Ex[zIndex]);
+      }
+    }
+    void updateEx() {
+      double coeff, loss;
+      /* Electric field constant at left and rightmost node */
+      for(int zIndex = 1; zIndex < size - 1; zIndex++) {
+        loss = eLoss(zIndex);
+        Ex[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        coeff = cour * imp0 / permittivity(zIndex) / (1.0 + loss);
+        Ex[zIndex] += coeff * (Hy[zIndex] - Hy[zIndex - 1]);
+      }
+    }
+    
+  private:
+
+};
+
 /* Adds an interface between free space and a dielectric medium of a different
 relative permittivity and permeability */
 class DielectricInterface: virtual public Scenario{
@@ -124,13 +164,13 @@ class DielectricInterface: virtual public Scenario{
     double dielectricPermeability = 1.0;
   
   protected:
-    double permittivity(double zIndex) {
+    double permittivity(int zIndex) {
       if(zIndex < dielectricIndex) {
         return 1.0;
       }
       return dielectricPermittivity;
     }
-    double permeability(double zIndex) {
+    double permeability(int zIndex) {
       if(zIndex < dielectricIndex) {
         return 1.0;
       }
@@ -150,13 +190,13 @@ class LossyInterface: virtual public Scenario{
     double magneticLoss = 0.0;
     
   protected:
-    double eLoss(double zIndex) {
+    double eLoss(int zIndex) {
       if(zIndex < lossyIndex) {
         return 0.0;
       }
       return electricLoss;
     }
-    double hLoss(double zIndex) {
+    double hLoss(int zIndex) {
       if(zIndex < lossyIndex) {
         return 0.0;
       }
@@ -224,8 +264,8 @@ point */
 class TotalScattered: virtual public Scenario {
   protected:
     /* Corrects the update equation to make the source wave unidirecitonal */
-    void tfsfCorrection(double tIndex) {
-      Hy[sourceNode - 1] -= source(tIndex - 1.0) / imp0;
+    void tfsfCorrection(int tIndex) {
+      Hy[sourceNode - 1] -= source(tIndex - 1) / imp0;
     }
   
 };
