@@ -19,36 +19,36 @@ void outputField(vector<double> &F, ofstream &output);
 
 int main() {
   
-  // //Basic example - free space resonator with one source node
-  // Scenario basic;
-  // basic.sourceNode = defaultSource;
-  // simulate(basic, dur, outputInterval, "output/basic");
+  //Basic example - free space resonator with one source node
+  Scenario basic;
+  basic.sourceNode = defaultSource;
+  simulate(basic, dur, outputInterval, "output/basic");
   
   class : public TotalScattered
           , public DielectricInterface
           , public AdvectionABC
           {} incident;
-  simulate(incident, dur, outputInterval, "output/tfsf");
+  simulate(incident, dur, outputInterval, "output/tfsf-aabc-dielectric");
   
-  // class : public AbsorbingBoundaries
-  //         , public DielectricInterface
-  //         , public LossyInterface
-  //         {} scene1;
-  // scene1.sourceNode = defaultSource;
-  // scene1.dielectricPermittivity = 9.0;
-  // scene1.electricLoss = 0.0;
-  // scene1.cour = courant;
-  // simulate(scene1, dur, outputInterval, "output/naive-absorbing-dielectric");
+  class : public AbsorbingBoundaries
+          , public DielectricInterface
+          , public LossyInterface
+          {} scene1;
+  scene1.sourceNode = defaultSource;
+  scene1.dielectricPermittivity = 9.0;
+  scene1.electricLoss = 0.0;
+  scene1.cour = courant;
+  simulate(scene1, dur, outputInterval, "output/abc-dielectric");
   
-  // class : public AdvectionABC
-  //         , public DielectricInterface
-  //         , public LossyInterface
-  //         {} scene2;
-  // scene2.sourceNode = defaultSource;
-  // scene2.dielectricPermittivity = 9.0;
-  // scene2.electricLoss = 0.0;
-  // scene2.cour = courant;
-  // simulate(scene2, dur, outputInterval, "output/advection-absorbing-dielectric");
+  class : public AdvectionABC
+          , public DielectricInterface
+          , public LossyInterface
+          {} scene2;
+  scene2.sourceNode = defaultSource;
+  scene2.dielectricPermittivity = 9.0;
+  scene2.electricLoss = 0.0;
+  scene2.cour = courant;
+  simulate(scene2, dur, outputInterval, "output/aabc-dielectric");
 
   return 0;
 
@@ -96,9 +96,7 @@ void simulate(Scenario &scene, int duration, int outputInterval, string basename
 
 // Output a row `F` to file `output`
 void outputField(vector<double> &F, ofstream &output) {
-  
   int size = F.size();
-
   for(int zIndex = 0; zIndex < size; zIndex++) {
     output << F[zIndex] << "\t";
   }

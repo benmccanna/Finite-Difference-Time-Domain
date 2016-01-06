@@ -16,46 +16,45 @@ for updating fields in time. We inherit from this class to define more complex
 simulations. */
 class Scenario {
   public:
-    int size = defaultSize; // Size of the space being simulated
-    int sourceNode = 50;     // Location of the source node
-    double cour = 1.0;      // Courant number, determines how fast waves travel
-    vector<double> Ex, Hy;  // Electric and magnetic fields
+    int size = defaultSize;           // Size of the space being simulated
+    int sourceNode = int(size/4);     // Location of the source node
+    double sourcePeak = 30.0;         // Time of the source peak
+    double cour = 1.0;                // Courant number, determines how fast waves travel
+    vector<double> Ex, Hy;            // Electric and magnetic field arrays
     
     /* Init makes sure the scenario is ready to be run - it should also make
     sure there's no state left over from previous simulations. By default, the
     only state is in the two fields. */
     virtual void init() {
-      // Initialise fields to zero
+      /* Initialise fields to zero */
       Ex = vector<double> (size, 0.0);
       Hy = vector<double> (size, 0.0);
       
+      /* Boundary conditions fail if an additive source is on or next to the 
+      boundary */
       if(sourceNode < 2 || sourceNode > size - 2) {
         cout << "Field source out of range of the simulation." << endl
-          << "Please enter a valid source node (integer between 2 and "
+          << "Please enter a valid source node (an integer between 2 and "
           << size - 2 << ")" << endl;
         cin >> sourceNode;
       }
     }
     
-    // Field excited at specified node
-    virtual void source(double tIndex) {
-      double srcT = tIndex - 30.0;
-      Ex[sourceNode] += exp(-srcT*srcT / 100.0);
+    /* Field excited at specified node */
+    virtual double source(double tIndex) {
+      double srcT = tIndex - sourcePeak;
+      return exp(-srcT*srcT / 100.0);
     }
     
     /* The step function moves the simulation forward one step. */
     void step(double tIndex) {
       updateFields(tIndex);
-      source(tIndex);
     }
 
   protected:
-  
     /* Update the interior fields according to the Yee algorithm */
-    
     void updateHy() {
       double coeff, loss;
-
       /* Magnetic field constant at rightmost node */
       for(int zIndex = 0; zIndex < size - 1; zIndex++) {
         loss = hLoss(zIndex);
@@ -64,10 +63,8 @@ class Scenario {
         Hy[zIndex] += coeff * (Ex[zIndex + 1] - Ex[zIndex]);
       }
     }
-    
     void updateEx() {
       double coeff, loss;
-
       /* Electric field constant at leftmost node */
       for(int zIndex = 1; zIndex < size; zIndex++) {
         loss = eLoss(zIndex);
@@ -77,28 +74,29 @@ class Scenario {
       }
     }
     
+    virtual void updateSource(double tIndex) {
+      Ex[sourceNode] += source(tIndex);
+    }
+    
     virtual void abcValues() {}
-    virtual void tfsfHy(double tIndex) {}
+    virtual void tfsfCorrection(double tIndex) {}
     virtual void abcHy() {}
-    virtual void tfsfEx(double tIndex) {}
     virtual void abcEx() {}
-
   
-    /* This function will be used to apply different boundary conditions. In the
-    basic case one field is fixed at zero at each end, and the simulated region
-    behaves like a resonant cavity */
+    /* This function is a wrapper for all the possible field update functions
+    required by various scenarios, allowing derived classes to avoid conflicting
+    inheritance */
     virtual void updateFields(double tIndex) {
       abcValues();
       updateHy();
-      tfsfHy(tIndex);
+      tfsfCorrection(tIndex);
       abcHy();
       updateEx();
-      tfsfEx(tIndex);
       abcEx();
+      updateSource(tIndex);
     }
 
-
-    // Relative permittivity and permeability of material
+    /* Relative permittivity and permeability of material */
     virtual double permittivity(double zIndex) {
       return 1.0;
     }
@@ -120,7 +118,6 @@ class Scenario {
 /* Adds an interface between free space and a dielectric medium of a different
 relative permittivity and permeability */
 class DielectricInterface: virtual public Scenario{
-  
   public:
     int dielectricIndex = size/2;
     double dielectricPermittivity = 2.0;
@@ -133,7 +130,6 @@ class DielectricInterface: virtual public Scenario{
       }
       return dielectricPermittivity;
     }
-    
     double permeability(double zIndex) {
       if(zIndex < dielectricIndex) {
         return 1.0;
@@ -148,9 +144,8 @@ class DielectricInterface: virtual public Scenario{
 
 /* Adds a lossy region with non-zero electric and/or magnetic conductivity */
 class LossyInterface: virtual public Scenario{
-  
   public:
-    int lossyIndex = size/2;
+    int lossyIndex = size/2;  
     double electricLoss = 0.01;
     double magneticLoss = 0.0;
     
@@ -161,7 +156,6 @@ class LossyInterface: virtual public Scenario{
       }
       return electricLoss;
     }
-    
     double hLoss(double zIndex) {
       if(zIndex < lossyIndex) {
         return 0.0;
@@ -191,7 +185,6 @@ class AbsorbingBoundaries: virtual public Scenario {
     virtual void abcEx() {
       Ex[0] = ExOldLeft;
     }
-
     double HyOldRight, ExOldLeft;
 
 };
@@ -211,17 +204,16 @@ class AdvectionABC: virtual public AbsorbingBoundaries {
       coeffRight = (1.0 - temp) / (1.0 + temp);
     }
 
-  /* Fields on the boundary are now updated according to their present values,
-  the local relative permittivity and permeability, and the past and present
-  values of their nearest neighbours */
   protected:
+    /* Fields on the boundary are now updated according to their present values,
+    the local relative permittivity and permeability, and the past and present
+    values of their nearest neighbours */
     void abcHy() {
       Hy[size - 1] = HyOldRight + coeffRight * (Hy[size - 2] - Hy[size - 1]);
     }
     void abcEx() {
       Ex[0] = ExOldLeft + coeffLeft * (Ex[1] - Ex[0]);
     }
-
     double coeffLeft, coeffRight;
 
 };
@@ -230,26 +222,10 @@ class AdvectionABC: virtual public AbsorbingBoundaries {
 rightwards from a point using a Total-Field/Scattered-Field boundary at that
 point */
 class TotalScattered: virtual public Scenario {
-  public:
-    int tfsfIndex = int(size/4);
-    
-    /* Overwriting the basic additive source node */
-    void source(double zIndex) {}
-    
-    double tfsfSource(double tIndex) {
-      double srcT = tIndex - 30.0;
-      return exp(-srcT*srcT / 100.0);
-    }
-    
-    
-  /* Corrections to the update equation to inject a unidirectional wave pulse */
   protected:
-    void tfsfHy(double tIndex) {
-      Hy[tfsfIndex - 1] -= tfsfSource(tIndex) / imp0;
-    }
-    
-    void tfsfEx(double tIndex) {
-      Ex[tfsfIndex] += tfsfSource(tIndex + 1.0);
+    /* Corrects the update equation to make the source wave unidirecitonal */
+    void tfsfCorrection(double tIndex) {
+      Hy[sourceNode - 1] -= source(tIndex - 1.0) / imp0;
     }
   
 };
