@@ -8,7 +8,6 @@
 
 using namespace std;
 
-const int defaultSize = 200;  // Default size of the simulation
 const double imp0 = 377.0;    // Impedance of free space
 const double pi = 4.0*atan(1);
 
@@ -17,20 +16,20 @@ for updating fields in time. We inherit from this class to define more complex
 simulations. */
 class Scenario {
   public:
-    int size = defaultSize;           // Size of the space being simulated
-    int sourceNode;     // Location of the source node
+    int size;           // Size of the space being simulated
+    int sourceNode;                   // Location of the source node
     double sourcePeak = 30.0;         // Time of the source peak
     double cour = 1.0;                // Courant number, determines how fast waves travel
-    vector<double> Ex, Hy;            // Electric and magnetic field arrays
+    vector<double> Ey, Hx;            // Electric and magnetic field arrays
     
     /* Init makes sure the scenario is ready to be run - it should also make
     sure there's no state left over from previous simulations. By default, the
     only state is in the two fields. */
     virtual void init() {
       /* Initialise fields to zero */
-      Ex = vector<double> (size, 0.0);
-      Hy = vector<double> (size, 0.0);
-      checkSource();
+      Ey = vector<double> (size, 0.0);
+      Hx = vector<double> (size, 0.0);
+      checkVars();
     }
     
     /* The step function moves the simulation forward one step. */
@@ -39,79 +38,83 @@ class Scenario {
     }
 
   protected:
+    virtual void checkVars() {
+      /* Some boundary conditions fail if an additive source is on or next to the 
+      boundary */
+      while(sourceNode < 2 || sourceNode > size - 2) {
+        cout << "Set field source position - any integer from 2 to " << size - 2
+          << endl;
+        cin >> sourceNode;
+      }
+      checkDielectric();
+      checkLossLayer();
+    }
+    virtual void checkDielectric() {}
+    virtual void checkLossLayer() {}
+    
     /* Update the interior fields according to the Yee algorithm */
-    virtual void updateHy() {
+    virtual void updateHx() {
       double coeff, loss;
       /* Magnetic field constant at rightmost node */
       for(int zIndex = 0; zIndex < size - 1; zIndex++) {
         loss = hLoss(zIndex);
-        Hy[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        Hx[zIndex] *= (1.0 - loss) / (1.0 + loss);
         coeff = cour / imp0 / permeability(zIndex) / (1.0 + loss);
-        Hy[zIndex] += coeff * (Ex[zIndex + 1] - Ex[zIndex]);
+        Hx[zIndex] += coeff * (Ey[zIndex + 1] - Ey[zIndex]);
       }
     }
-    virtual void updateEx() {
+    virtual void updateEy() {
       double coeff, loss;
       /* Electric field constant at leftmost node */
       for(int zIndex = 1; zIndex < size; zIndex++) {
         loss = eLoss(zIndex);
-        Ex[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        Ey[zIndex] *= (1.0 - loss) / (1.0 + loss);
         coeff = cour * imp0 / permittivity(zIndex) / (1.0 + loss);
-        Ex[zIndex] += coeff * (Hy[zIndex] - Hy[zIndex - 1]);
+        Ey[zIndex] += coeff * (Hx[zIndex] - Hx[zIndex - 1]);
       }
     }
-    
+
     /* Field excited at specified node */
     virtual double source(int tIndex) {
       double srcT = double(tIndex) - sourcePeak;
       return exp(-srcT*srcT / 100.0);
     }
-    virtual void checkSource() {
-      /* Boundary conditions fail if an additive source is on or next to the 
-      boundary */
-      if(sourceNode < 2 || sourceNode > size - 2) {
-        cout << "Field source out of range of the simulation." << endl
-          << "Please enter a valid source node (an integer between 2 and "
-          << size - 2 << ")" << endl;
-        cin >> sourceNode;
-      }
-    }
     virtual void updateSource(int tIndex) {
-      Ex[sourceNode] += source(tIndex);
+      Ey[sourceNode] += source(tIndex);
     }
     
     virtual void abcValues() {}
     virtual void tfsfCorrection(int tIndex) {}
-    virtual void abcHy() {}
-    virtual void abcEx() {}
+    virtual void abcHx() {}
+    virtual void abcEy() {}
   
     /* This function is a wrapper for all the possible field update functions
     required by various scenarios, allowing derived classes to avoid conflicting
     inheritance */
     virtual void updateFields(int tIndex) {
       abcValues();
-      updateHy();
+      updateHx();
       tfsfCorrection(tIndex);
-      abcHy();
-      updateEx();
-      abcEx();
+      abcHx();
+      updateEy();
+      abcEy();
       updateSource(tIndex);
     }
 
     /* Relative permittivity and permeability of material */
-    virtual double permittivity(double zIndex) {
+    virtual double permittivity(int zIndex) {
       return 1.0;
     }
-    virtual double permeability(double zIndex) {
+    virtual double permeability(int zIndex) {
       return 1.0;
     }
     
     /* Loss factor in the electric and magnetic fields due to electric and
     magnetic conductivity respectively */
-    virtual double eLoss(double zIndex) {
+    virtual double eLoss(int zIndex) {
       return 0.0;
     }
-    virtual double hLoss(double zIndex) {
+    virtual double hLoss(int zIndex) {
       return 0.0;
     }
 
@@ -120,9 +123,9 @@ class Scenario {
 class Standing: virtual public Scenario{
   public:
     void init() {
-      Ex = vector<double> (size, 0.0);
-      Hy = vector<double> (size - 1, 0.0);
-      checkSource();
+      Ey = vector<double> (size, 0.0);
+      Hx = vector<double> (size - 1, 0.0);
+      checkVars();
     }
     double frequency;
     double source(int tIndex) {
@@ -131,50 +134,62 @@ class Standing: virtual public Scenario{
     }
     
   protected:
-    void updateHy() {
+    void updateHx() {
       double coeff, loss;
       for(int zIndex = 0; zIndex < size - 1; zIndex++) {
         loss = hLoss(zIndex);
-        Hy[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        Hx[zIndex] *= (1.0 - loss) / (1.0 + loss);
         coeff = cour / imp0 / permeability(zIndex) / (1.0 + loss);
-        Hy[zIndex] += coeff * (Ex[zIndex + 1] - Ex[zIndex]);
+        Hx[zIndex] += coeff * (Ey[zIndex + 1] - Ey[zIndex]);
       }
     }
-    void updateEx() {
+    void updateEy() {
       double coeff, loss;
       /* Electric field constant at left and rightmost node */
       for(int zIndex = 1; zIndex < size - 1; zIndex++) {
         loss = eLoss(zIndex);
-        Ex[zIndex] *= (1.0 - loss) / (1.0 + loss);
+        Ey[zIndex] *= (1.0 - loss) / (1.0 + loss);
         coeff = cour * imp0 / permittivity(zIndex) / (1.0 + loss);
-        Ex[zIndex] += coeff * (Hy[zIndex] - Hy[zIndex - 1]);
+        Ey[zIndex] += coeff * (Hx[zIndex] - Hx[zIndex - 1]);
       }
     }
     
-  private:
-
 };
 
-/* Adds an interface between free space and a dielectric medium of a different
-relative permittivity and permeability */
-class DielectricInterface: virtual public Scenario{
+/* Adds a dielectric medium between dLeft and dRight */
+class Dielectric: virtual public Scenario{
   public:
-    int dielectricIndex = size/2;
+    int dLeft, dRight;
     double dielectricPermittivity = 2.0;
     double dielectricPermeability = 1.0;
   
   protected:
+    void checkDielectric() {
+      while(dLeft < 0 || dLeft > size - 1) {
+        cout << "Set left edge of dielectric - any integer from 0 to "
+          << size - 1 << endl;
+        cin >> dLeft;
+      }
+      while(dRight < dLeft || dRight > size - 1) {
+        cout << "Set right edge of dielectric - any integer from " << dLeft
+          << " to " << size - 1 << endl;
+        cin >> dRight;
+      }
+    }
+    
     double permittivity(int zIndex) {
-      if(zIndex < dielectricIndex) {
+      if(zIndex < dLeft || zIndex > dRight) {
         return 1.0;
       }
       return dielectricPermittivity;
     }
     double permeability(int zIndex) {
-      if(zIndex < dielectricIndex) {
+      if(zIndex < dLeft || zIndex > dRight) {
         return 1.0;
       }
-      if(zIndex == dielectricIndex) {
+      /* Averages the two permeability values on the boundaries so that the
+      interfaces are aligned with a particular (magnetic field) node */
+      if(zIndex == dLeft || zIndex == dRight) {
         return 0.5 * (1.0 + dielectricPermeability);
       }
       return dielectricPermeability;
@@ -183,27 +198,41 @@ class DielectricInterface: virtual public Scenario{
 };
 
 /* Adds a lossy region with non-zero electric and/or magnetic conductivity */
-class LossyInterface: virtual public Scenario{
+class LossLayer: virtual public Scenario{
   public:
-    int lossyIndex = size/2;  
+    int lLeft, lRight;
     double electricLoss = 0.01;
     double magneticLoss = 0.0;
     
   protected:
+    void checkLossLayer() {
+      while(lLeft < 0 || lLeft > size - 1) {
+        cout << "Set left edge of lossy region - any integer from 0 to "
+          << size - 1 << endl;
+        cin >> lLeft;
+      }
+      while(lRight < lLeft || lRight > size - 1) {
+        cout << "Set right edge of lossy region - any integer from " << lLeft
+          << " to " << size - 1 << endl;
+        cin >> lRight;
+      }
+    }
+    
     double eLoss(int zIndex) {
-      if(zIndex < lossyIndex) {
+      if(zIndex < lLeft || zIndex > lRight) {
         return 0.0;
       }
       return electricLoss;
     }
     double hLoss(int zIndex) {
-      if(zIndex < lossyIndex) {
+      if(zIndex < lLeft || zIndex > lRight) {
         return 0.0;
       }
-      if(zIndex == lossyIndex) {
-        return 0.5*electricLoss;
+      /* Again, to ensure the location of the interfaces is unambiguous */
+      if(zIndex == lLeft || zIndex == lRight) {
+        return 0.5*magneticLoss;
       }
-      return electricLoss;
+      return magneticLoss;
     }
   
 };
@@ -216,16 +245,16 @@ class AbsorbingBoundaries: virtual public Scenario {
   free space scenarios */
   protected:
     virtual void abcValues() {
-      HyOldRight = Hy[size - 2];
-      ExOldLeft = Ex[1];
+      HxOldRight = Hx[size - 2];
+      EyOldLeft = Ey[1];
     }
-    virtual void abcHy() {
-      Hy[size - 1] = HyOldRight;
+    virtual void abcHx() {
+      Hx[size - 1] = HxOldRight;
     }
-    virtual void abcEx() {
-      Ex[0] = ExOldLeft;
+    virtual void abcEy() {
+      Ey[0] = EyOldLeft;
     }
-    double HyOldRight, ExOldLeft;
+    double HxOldRight, EyOldLeft;
 
 };
 
@@ -248,11 +277,11 @@ class AdvectionABC: virtual public AbsorbingBoundaries {
     /* Fields on the boundary are now updated according to their present values,
     the local relative permittivity and permeability, and the past and present
     values of their nearest neighbours */
-    void abcHy() {
-      Hy[size - 1] = HyOldRight + coeffRight * (Hy[size - 2] - Hy[size - 1]);
+    void abcHx() {
+      Hx[size - 1] = HxOldRight + coeffRight * (Hx[size - 2] - Hx[size - 1]);
     }
-    void abcEx() {
-      Ex[0] = ExOldLeft + coeffLeft * (Ex[1] - Ex[0]);
+    void abcEy() {
+      Ey[0] = EyOldLeft + coeffLeft * (Ey[1] - Ey[0]);
     }
     double coeffLeft, coeffRight;
 
@@ -265,7 +294,7 @@ class TotalScattered: virtual public Scenario {
   protected:
     /* Corrects the update equation to make the source wave unidirecitonal */
     void tfsfCorrection(int tIndex) {
-      Hy[sourceNode - 1] -= source(tIndex - 1) / imp0;
+      Hx[sourceNode - 1] -= source(tIndex - 1) / imp0;
     }
   
 };

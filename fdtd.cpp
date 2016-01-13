@@ -9,8 +9,7 @@
 
 using namespace std;
 
-const int dur = 5000;         /* how many frames to run the simulation for */
-const int outputInterval = 1; /* how often (in frames) to record the state of the simulation */
+const int outputInterval = 1; // how often (in frames) to record the state of the simulation
 const double courant = 1.0;
 const int defaultSource = 150;
 
@@ -18,48 +17,62 @@ void simulate(Scenario &scene, int duration, int outputInterval, string basesnam
 void outputField(vector<double> &F, ofstream &output);
 
 int main() {
+  int size, dur;
+  
+  size = 201;
+  dur = 500;
   
   // Scenario basic;
-  // simulate(basic, dur, outputInterval, "output/basic");
+  Scenario basic;
+  basic.size = size;
+  basic.sourceNode = size/4;
+  simulate(basic, dur, outputInterval, "output/basic");
   
-  int size = 501;
+  size = 201;
+  dur = 1000;
 
   Standing standingWaves;
   standingWaves.size = size;
   
-  for(int harmonic = 1; harmonic < 9; harmonic++) {
+  for(int harmonic = 1; harmonic < 2; harmonic++) {
     standingWaves.sourceNode = floor(size * 1 / (harmonic * 2));
     standingWaves.frequency = 0.5 * harmonic / double(size - 1);
     simulate(standingWaves, dur, outputInterval, "output/standing-waves" + to_string(harmonic));
   }
-
-  // class : public TotalScattered
-  //         , public DielectricInterface
-  //         , public AdvectionABC
-  //         {} incident;
-  // simulate(incident, dur, outputInterval, "output/tfsf-aabc-dielectric");
   
-  // class : public AbsorbingBoundaries
-  //         , public DielectricInterface
-  //         , public LossyInterface
-  //         {} scene1;
-  // scene1.sourceNode = defaultSource;
-  // scene1.dielectricPermittivity = 9.0;
-  // scene1.electricLoss = 0.0;
-  // scene1.cour = courant;
-  // simulate(scene1, dur, outputInterval, "output/abc-dielectric");
-  
-  // class : public AdvectionABC
-  //         , public DielectricInterface
-  //         , public LossyInterface
-  //         {} scene2;
-  // scene2.sourceNode = defaultSource;
-  // scene2.dielectricPermittivity = 9.0;
-  // scene2.electricLoss = 0.0;
-  // scene2.cour = courant;
-  // simulate(scene2, dur, outputInterval, "output/aabc-dielectric");
+  size = 201;
+  dur = 500;
 
-  return 0;
+  class : public TotalScattered,
+          public Dielectric,
+          public AdvectionABC
+          {} incident;
+  incident.size = size;
+  incident.sourceNode = size/4;
+  incident.dLeft = 100;
+  incident.dRight = size - 1;
+  incident.dielectricPermittivity = 9.0;
+  simulate(incident, dur, outputInterval, "output/Incident-on-perfect-dielectric");
+  
+  class : public LossLayer,
+          public TotalScattered,
+          public Dielectric,
+          public AdvectionABC
+    {} lossyDielectric;
+  lossyDielectric.size = size;
+  lossyDielectric.sourceNode = size/4;
+  lossyDielectric.dLeft = 100;
+  lossyDielectric.dRight = size - 1;
+  lossyDielectric.lLeft = 180;
+  lossyDielectric.lRight = size - 1;
+  lossyDielectric.dielectricPermittivity = 3.0;
+  lossyDielectric.dielectricPermeability = 3.0;
+  lossyDielectric.electricLoss = 0.02;
+  lossyDielectric.magneticLoss = 0.08;
+  simulate(lossyDielectric, dur, outputInterval, "output/Dielectric-with-lossy-region");
+  
+  lossyDielectric.magneticLoss = 0.02;
+  simulate(lossyDielectric, dur, outputInterval, "output/Dielectric-with-lossy-region-matched");
 
 }
 
@@ -79,9 +92,9 @@ void simulate(Scenario &scene, int duration, int outputInterval, string basename
   // Open output files for the field arrays
   string filename;
   ofstream outE, outH;
-  filename = basename + "-Ex.dat";
+  filename = basename + "-(Ey).dat";
   outE.open(filename.c_str());
-  filename = basename + "-Hy.dat";
+  filename = basename + "-(Hx).dat";
   outH.open(filename.c_str());
   
   // The actual simulation:
@@ -91,8 +104,8 @@ void simulate(Scenario &scene, int duration, int outputInterval, string basename
     
     // Output rows of data to our two output files every `outputInterval` steps
     if(tIndex % outputInterval == 0) {
-      outputField(scene.Ex, outE);
-      outputField(scene.Hy, outH);
+      outputField(scene.Ey, outE);
+      outputField(scene.Hx, outH);
     }
   }
   
