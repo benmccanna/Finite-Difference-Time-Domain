@@ -1,3 +1,4 @@
 *.out
 output/*.dat
 output/*.png
+info/
