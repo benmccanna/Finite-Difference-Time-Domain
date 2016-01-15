@@ -1,4 +1,6 @@
 *.out
 output/*.dat
 output/*.png
+output/tex/*.eps
+output/tex/*.tex
 info/

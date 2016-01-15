@@ -147,7 +147,8 @@ class Standing : virtual public Scenario {
 /* Adds a dielectric medium between dLeft and dRight */
 class Dielectric : virtual public Scenario {
  public:
-  int dLeft, dRight;
+  int dLeft = -1;
+  int dRight = -1;
   double dielectricPermittivity = 2.0;
   double dielectricPermeability = 1.0;
 
@@ -187,7 +188,8 @@ class Dielectric : virtual public Scenario {
 /* Adds a lossy region with non-zero electric and/or magnetic conductivity */
 class LossLayer : virtual public Scenario {
  public:
-  int lLeft, lRight;
+  int lLeft;
+  int lRight;
   double electricLoss = 0.01;
   double magneticLoss = 0.0;
 
@@ -272,7 +274,12 @@ point */
 class TotalScattered : virtual public Scenario {
  protected:
   /* Corrects the update equation to make the source wave unidirecitonal */
+  void updateSource(int tIndex) {
+    double coeff = cour / sqrt(permittivity(sourceNode));
+    Ey[sourceNode] += coeff * source(tIndex + 1);
+  }
   void tfsfCorrection(int tIndex) {
-    Hx[sourceNode - 1] -= source(tIndex - 1) / imp0;
+    double coeff = cour / imp0 / sqrt(permeability(sourceNode - 1));
+    Hx[sourceNode - 1] -= coeff * source(tIndex);
   }
 };

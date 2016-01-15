@@ -23,66 +23,40 @@ void outputField(vector<double>& F, ofstream& output);
 int main() {
   int size, dur;
 
-  size = 201;
+  size = 501;
+  dur = 1001;
 
-  // Scenario basic;
-  // Scenario basic;
-  // basic.size = size;
-  // basic.sourceNode = size / 4;
-  // simulate(basic, dur, outputInterval, "output/basic");
+  Scenario basic;
+  basic.size = size;
+  simulate(basic, dur, outputInterval, "output/PEC-PMC");
 
-  size = 401;
-  dur = 4000;
+  class : public TotalScattered,
+          public LossLayer,
+          public AbsorbingBoundaries {
+  } scene1;
+  scene1.size = size;
+  scene1.electricLoss = 0.02;
+  simulate(scene1, dur, outputInterval,
+          "output/TFSF-Lossy-Dielectric-ABC");
+          
+  class : public TotalScattered,
+          public Dielectric,
+          public AdvectionABC {
+  } scene2;
+  scene2.size = size;
+  scene2.dielectricPermittivity = 9.0;
+  simulate(scene2, dur, outputInterval,
+          "output/TFSF-Lossy-Dielectric-AABC");
 
   Standing standingWaves;
   standingWaves.size = size;
   standingWaves.sourceNode = floor(size / 2);
-  int harmonic = 1;
-  double precis = 0.0004;
-  double f0 = 0.5 * harmonic / double(size - 1);
-  double freq = f0 - precis;
+  double harmonic = 1.0;
+  standingWaves.frequency = 0.5 * harmonic / double(size - 1);
+  simulate(standingWaves, dur, outputInterval,
+            "output/Harmonic-" + to_string(harmonic) + "(Frequency-" + 
+            to_string(standingWaves.frequency) + ")");
 
-  for (int i=0; i < 3; i++) {
-    standingWaves.frequency = freq;
-    simulate(standingWaves, dur, outputInterval,
-             "output/PEC-Boundaries-(Frequency-" + to_string(freq) + ")");
-    freq += precis;
-  }
-
-  size = 201;
-  dur = 500;
-
-//   class : public TotalScattered, public Dielectric, public AdvectionABC {
-//   } incident;
-//   incident.size = size;
-//   incident.sourceNode = size / 4;
-//   incident.dLeft = 100;
-//   incident.dRight = size - 1;
-//   incident.dielectricPermittivity = 9.0;
-//   simulate(incident, dur, outputInterval,
-//           "output/Incident-on-perfect-dielectric");
-
-//   class : public LossLayer,
-//           public TotalScattered,
-//           public Dielectric,
-//           public AdvectionABC {
-//   } lossyDielectric;
-//   lossyDielectric.size = size;
-//   lossyDielectric.sourceNode = size / 4;
-//   lossyDielectric.dLeft = 100;
-//   lossyDielectric.dRight = size - 1;
-//   lossyDielectric.lLeft = 180;
-//   lossyDielectric.lRight = size - 1;
-//   lossyDielectric.dielectricPermittivity = 3.0;
-//   lossyDielectric.dielectricPermeability = 3.0;
-//   lossyDielectric.electricLoss = 0.02;
-//   lossyDielectric.magneticLoss = 0.08;
-//   simulate(lossyDielectric, dur, outputInterval,
-//           "output/Dielectric-with-lossy-region");
-
-//   lossyDielectric.magneticLoss = 0.02;
-//   simulate(lossyDielectric, dur, outputInterval,
-//           "output/Dielectric-with-lossy-region-matched");
 }
 
 /* Runs simulations and saves the results to files. Takes a `Scenario` which
