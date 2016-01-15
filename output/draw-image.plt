@@ -1,10 +1,10 @@
-set term png
+set term png enhanced
 set pm3d map
 
 set output sprintf("%s.png", filetitle)
 set title filetitle
-set xlabel "z index"
-set ylabel "t index"
+set xlabel "z / c {/Symbol D} t"
+set ylabel "time / {/Symbol D} t"
 
 set xrange [0:*]
 set yrange [0:*]

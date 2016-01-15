@@ -11,3 +11,4 @@ clean:
 	rm fdtd.out
 	rm output/*.png
 	rm output/*.dat
+	rm output/*.pdf

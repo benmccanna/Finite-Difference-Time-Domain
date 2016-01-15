@@ -24,61 +24,65 @@ int main() {
   int size, dur;
 
   size = 201;
-  dur = 500;
 
   // Scenario basic;
-  Scenario basic;
-  basic.size = size;
-  basic.sourceNode = size / 4;
-  simulate(basic, dur, outputInterval, "output/basic");
+  // Scenario basic;
+  // basic.size = size;
+  // basic.sourceNode = size / 4;
+  // simulate(basic, dur, outputInterval, "output/basic");
 
-  size = 201;
-  dur = 1000;
+  size = 401;
+  dur = 4000;
 
   Standing standingWaves;
   standingWaves.size = size;
+  standingWaves.sourceNode = floor(size / 2);
+  int harmonic = 1;
+  double precis = 0.0004;
+  double f0 = 0.5 * harmonic / double(size - 1);
+  double freq = f0 - precis;
 
-  for (int harmonic = 1; harmonic < 2; harmonic++) {
-    standingWaves.sourceNode = floor(size * 1 / (harmonic * 2));
-    standingWaves.frequency = 0.5 * harmonic / double(size - 1);
+  for (int i=0; i < 3; i++) {
+    standingWaves.frequency = freq;
     simulate(standingWaves, dur, outputInterval,
-             "output/standing-waves" + to_string(harmonic));
+             "output/PEC-Boundaries-(Frequency-" + to_string(freq) + ")");
+    freq += precis;
   }
 
   size = 201;
   dur = 500;
 
-  class : public TotalScattered, public Dielectric, public AdvectionABC {
-  } incident;
-  incident.size = size;
-  incident.sourceNode = size / 4;
-  incident.dLeft = 100;
-  incident.dRight = size - 1;
-  incident.dielectricPermittivity = 9.0;
-  simulate(incident, dur, outputInterval,
-           "output/Incident-on-perfect-dielectric");
+//   class : public TotalScattered, public Dielectric, public AdvectionABC {
+//   } incident;
+//   incident.size = size;
+//   incident.sourceNode = size / 4;
+//   incident.dLeft = 100;
+//   incident.dRight = size - 1;
+//   incident.dielectricPermittivity = 9.0;
+//   simulate(incident, dur, outputInterval,
+//           "output/Incident-on-perfect-dielectric");
 
-  class : public LossLayer,
-          public TotalScattered,
-          public Dielectric,
-          public AdvectionABC {
-  } lossyDielectric;
-  lossyDielectric.size = size;
-  lossyDielectric.sourceNode = size / 4;
-  lossyDielectric.dLeft = 100;
-  lossyDielectric.dRight = size - 1;
-  lossyDielectric.lLeft = 180;
-  lossyDielectric.lRight = size - 1;
-  lossyDielectric.dielectricPermittivity = 3.0;
-  lossyDielectric.dielectricPermeability = 3.0;
-  lossyDielectric.electricLoss = 0.02;
-  lossyDielectric.magneticLoss = 0.08;
-  simulate(lossyDielectric, dur, outputInterval,
-           "output/Dielectric-with-lossy-region");
+//   class : public LossLayer,
+//           public TotalScattered,
+//           public Dielectric,
+//           public AdvectionABC {
+//   } lossyDielectric;
+//   lossyDielectric.size = size;
+//   lossyDielectric.sourceNode = size / 4;
+//   lossyDielectric.dLeft = 100;
+//   lossyDielectric.dRight = size - 1;
+//   lossyDielectric.lLeft = 180;
+//   lossyDielectric.lRight = size - 1;
+//   lossyDielectric.dielectricPermittivity = 3.0;
+//   lossyDielectric.dielectricPermeability = 3.0;
+//   lossyDielectric.electricLoss = 0.02;
+//   lossyDielectric.magneticLoss = 0.08;
+//   simulate(lossyDielectric, dur, outputInterval,
+//           "output/Dielectric-with-lossy-region");
 
-  lossyDielectric.magneticLoss = 0.02;
-  simulate(lossyDielectric, dur, outputInterval,
-           "output/Dielectric-with-lossy-region-matched");
+//   lossyDielectric.magneticLoss = 0.02;
+//   simulate(lossyDielectric, dur, outputInterval,
+//           "output/Dielectric-with-lossy-region-matched");
 }
 
 /* Runs simulations and saves the results to files. Takes a `Scenario` which
@@ -99,9 +103,9 @@ void simulate(Scenario& scene,
   // Open output files for the field arrays
   string filename;
   ofstream outE, outH;
-  filename = basename + "-(Ey).dat";
+  filename = basename + "-(Ey-Field).dat";
   outE.open(filename.c_str());
-  filename = basename + "-(Hx).dat";
+  filename = basename + "-(Hx-Field).dat";
   outH.open(filename.c_str());
 
   // The actual simulation:

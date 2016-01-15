@@ -107,6 +107,8 @@ class Scenario {
   virtual double hLoss(int zIndex) { return 0.0; }
 };
 
+/* Scenario optimised for generating standing waves. This class is self
+contained, it should only be used on its own */
 class Standing : virtual public Scenario {
  public:
   void init() {
@@ -222,7 +224,7 @@ class LossLayer : virtual public Scenario {
 };
 
 /* Adds the simplest form of Absorbing boundary conditions (ABCs), allowing
-energy to leave the simulation */
+energy to leave the simulation. Not compatible with AdvectionABC */
 class AbsorbingBoundaries : virtual public Scenario {
   /* The previously fixed field values are now assigned to the past value of
   their nearest neighbour, eliminating reflection from the boundaries in
@@ -238,7 +240,8 @@ class AbsorbingBoundaries : virtual public Scenario {
 };
 
 /* Adds ABCs using a first order discretised version of the advection equation,
-letting less of the field reflect than in the naive case */
+letting less of the field reflect than in the naive case. Not compatible with
+AbsorbingBoundaries */
 class AdvectionABC : virtual public AbsorbingBoundaries {
  public:
   void init() {
